@@ -53,6 +53,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         ]);
       }
     } catch (error: any) {
+      console.log('Register Error Full:', error);
+      console.log('Register Error Response:', error.response);
       const msg = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
       Alert.alert('Registrasi Gagal', msg);
     } finally {
