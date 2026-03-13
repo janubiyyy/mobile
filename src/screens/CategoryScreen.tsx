@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Modal, TextInput, Alert, ScrollView,
+  Modal, TextInput, ScrollView,
 } from 'react-native';
+import CustomAlert from '../components/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -21,6 +22,12 @@ const CategoryScreen = () => {
   const [icon, setIcon] = useState('📌');
   const [activeTab, setActiveTab] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
   const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; actions: any[] }>({
+    visible: false,
+    title: '',
+    message: '',
+    actions: [],
+  });
 
   const fetchCategories = async () => {
     try {
@@ -32,7 +39,15 @@ const CategoryScreen = () => {
   useFocusEffect(useCallback(() => { fetchCategories(); }, []));
 
   const handleAdd = async () => {
-    if (!name.trim()) { Alert.alert('Error', 'Nama kategori wajib diisi'); return; }
+    if (!name.trim()) {
+      setAlert({
+        visible: true,
+        title: 'Input Tidak Valid',
+        message: 'Nama kategori wajib diisi',
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/categories', { name: name.trim(), type, icon });
@@ -40,18 +55,36 @@ const CategoryScreen = () => {
       setName(''); setIcon('📌');
       fetchCategories();
     } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.message || 'Gagal menyimpan');
+      setAlert({
+        visible: true,
+        title: 'Gagal Menyimpan',
+        message: e.response?.data?.message || 'Terjadi kesalahan saat menyimpan kategori.',
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
     } finally { setSaving(false); }
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert('Hapus Kategori', 'Yakin? Kategori yang sedang digunakan transaksi tidak bisa dihapus.', [
-      { text: 'Batal', style: 'cancel' },
-      { text: 'Hapus', style: 'destructive', onPress: async () => {
-        try { await api.delete(`/categories/${id}`); fetchCategories(); }
-        catch (e: any) { Alert.alert('Gagal', e.response?.data?.message || 'Tidak bisa dihapus'); }
-      }},
-    ]);
+    setAlert({
+      visible: true,
+      title: 'Hapus Kategori',
+      message: 'Yakin? Kategori yang sedang digunakan transaksi tidak bisa dihapus.',
+      actions: [
+        { text: 'Batal', style: 'cancel', onPress: () => setAlert(a => ({ ...a, visible: false })) },
+        { text: 'Hapus', style: 'destructive', onPress: async () => {
+          setAlert(a => ({ ...a, visible: false }));
+          try { await api.delete(`/categories/${id}`); fetchCategories(); }
+          catch (e: any) {
+            setAlert({
+              visible: true,
+              title: 'Gagal',
+              message: e.response?.data?.message || 'Tidak bisa dihapus',
+              actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+            });
+          }
+        }},
+      ],
+    });
   };
 
   const filtered = categories.filter(c => c.type === activeTab);
@@ -127,6 +160,12 @@ const CategoryScreen = () => {
           </View>
         </View>
       </Modal>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        actions={alert.actions}
+      />
     </SafeAreaView>
   );
 };

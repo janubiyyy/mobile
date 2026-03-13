@@ -35,3 +35,14 @@ export const getGreeting = (): string => {
   if (hour < 18) return 'Selamat Sore';
   return 'Selamat Malam';
 };
+
+export const parseCurrency = (value: string): number => {
+  if (!value) return 0;
+  return Number(value.replace(/[^0-9]/g, ''));
+};
+
+export const formatCurrencyInput = (value: string): string => {
+  const numeric = value.replace(/[^0-9]/g, '');
+  if (!numeric) return '';
+  return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};

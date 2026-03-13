@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Modal, TextInput, Alert, ActivityIndicator,
+  Modal, TextInput, Alert, ActivityIndicator, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,8 +9,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import api from '../services/api';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import CustomAlert from '../components/CustomAlert';
 import { colors, spacing, typography, radius } from '../theme/colors';
-import { formatCurrency, formatDateShort } from '../utils/format';
+import { formatCurrency, formatDateShort, formatCurrencyInput, parseCurrency, formatDate } from '../utils/format';
 
 const EMOJIS = ['🍔','🚗','🏠','💊','📚','👗','🎮','☕','🛒','💡','🎵','✈️','💰','💼','📈','🎁','🍎','🐾','💇','🏋️'];
 
@@ -22,12 +23,20 @@ const TransactionScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; actions: any[] }>({
+    visible: false,
+    title: '',
+    message: '',
+    actions: [],
+  });
 
   // Form state
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
   const [note, setNote] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -45,29 +54,48 @@ const TransactionScreen = () => {
 
   const openAdd = () => {
     setEditItem(null);
-    setAmount(''); setType('EXPENSE'); setNote(''); setCategoryId('');
+    setAmount(''); setType('EXPENSE'); setNote(''); setCategoryId(''); setDate(new Date());
     setModalVisible(true);
   };
 
   const openEdit = (tx: any) => {
     setEditItem(tx);
     setAmount(String(tx.amount)); setType(tx.type); setNote(tx.note || ''); setCategoryId(tx.categoryId);
+    setDate(new Date(tx.date));
     setModalVisible(true);
   };
 
+  const handleAmountChange = (text: string) => {
+    setAmount(formatCurrencyInput(text));
+  };
+
   const handleSave = async () => {
-    if (!amount || !categoryId) { Alert.alert('Error', 'Jumlah dan kategori wajib diisi'); return; }
+    const rawAmount = parseCurrency(amount);
+    if (!rawAmount || !categoryId) {
+      setAlert({
+        visible: true,
+        title: 'Input Tidak Valid',
+        message: 'Jumlah dan kategori wajib diisi',
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
+      return;
+    }
     setSaving(true);
     try {
       if (editItem) {
-        await api.put(`/transactions/${editItem.id}`, { amount: Number(amount), type, note, categoryId });
+        await api.put(`/transactions/${editItem.id}`, { amount: rawAmount, type, note, categoryId, date: date.toISOString() });
       } else {
-        await api.post('/transactions', { amount: Number(amount), type, note, categoryId });
+        await api.post('/transactions', { amount: rawAmount, type, note, categoryId, date: date.toISOString() });
       }
       setModalVisible(false);
       fetchData();
     } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.message || 'Gagal menyimpan');
+      setAlert({
+        visible: true,
+        title: 'Gagal Menyimpan',
+        message: e.response?.data?.message || 'Terjadi kesalahan saat menyimpan transaksi.',
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
     } finally { setSaving(false); }
   };
 
@@ -153,70 +181,155 @@ const TransactionScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{editItem ? 'Edit Transaksi' : 'Transaksi Baru'}</Text>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              <Text style={styles.modalTitle}>{editItem ? 'Edit Transaksi (v2)' : 'Transaksi Baru (v2)'}</Text>
 
-            {/* Type Toggle */}
-            <View style={styles.typeToggle}>
-              <TouchableOpacity
-                style={[styles.typeBtn, type === 'EXPENSE' && styles.typeBtnActive]}
-                onPress={() => { setType('EXPENSE'); setCategoryId(''); }}
-              >
-                <Text style={[styles.typeBtnText, type === 'EXPENSE' && styles.typeBtnTextActive]}>💸 Pengeluaran</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.typeBtn, type === 'INCOME' && styles.typeBtnActiveIncome]}
-                onPress={() => { setType('INCOME'); setCategoryId(''); }}
-              >
-                <Text style={[styles.typeBtnText, type === 'INCOME' && styles.typeBtnTextActive]}>💰 Pemasukan</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Amount */}
-            <Text style={styles.fieldLabel}>Jumlah (Rp)</Text>
-            <TextInput
-              style={styles.amountInput}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={colors.placeholder}
-            />
-
-            {/* Note */}
-            <Text style={styles.fieldLabel}>Catatan (opsional)</Text>
-            <TextInput
-              style={styles.noteInput}
-              value={note}
-              onChangeText={setNote}
-              placeholder="Deskripsi transaksi..."
-              placeholderTextColor={colors.placeholder}
-            />
-
-            {/* Category */}
-            <Text style={styles.fieldLabel}>Kategori</Text>
-            <View style={styles.catGrid}>
-              {catFiltered.map(cat => (
+              {/* Type Toggle */}
+              <View style={styles.typeToggle}>
                 <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.catChip, categoryId === cat.id && styles.catChipActive]}
-                  onPress={() => setCategoryId(cat.id)}
+                  style={[styles.typeBtn, type === 'EXPENSE' && styles.typeBtnActive]}
+                  onPress={() => { setType('EXPENSE'); setCategoryId(''); }}
                 >
-                  <Text style={styles.catEmoji}>{cat.icon || '📌'}</Text>
-                  <Text style={[styles.catName, categoryId === cat.id && { color: colors.primary, fontWeight: '700' }]} numberOfLines={1}>{cat.name}</Text>
+                  <Text style={[styles.typeBtnText, type === 'EXPENSE' && styles.typeBtnTextActive]}>💸 Pengeluaran</Text>
                 </TouchableOpacity>
-              ))}
-              {catFiltered.length === 0 && (
-                <Text style={styles.noCat}>Buat kategori dulu di tab Profil</Text>
-              )}
-            </View>
+                <TouchableOpacity
+                  style={[styles.typeBtn, type === 'INCOME' && styles.typeBtnActiveIncome]}
+                  onPress={() => { setType('INCOME'); setCategoryId(''); }}
+                >
+                  <Text style={[styles.typeBtnText, type === 'INCOME' && styles.typeBtnTextActive]}>💰 Pemasukan</Text>
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.modalActions}>
-              <Button title="Batal" variant="outline" onPress={() => setModalVisible(false)} style={styles.cancelBtn} />
-              <Button title={editItem ? 'Simpan' : 'Tambah'} onPress={handleSave} loading={saving} style={styles.saveBtn} />
-            </View>
+              {/* Amount */}
+              <Text style={styles.fieldLabel}>Jumlah (Rp)</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={amount}
+                onChangeText={handleAmountChange}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={colors.placeholder}
+              />
+
+              {/* Note */}
+              <Text style={styles.fieldLabel}>Catatan (opsional)</Text>
+              <TextInput
+                style={styles.noteInput}
+                value={note}
+                onChangeText={setNote}
+                placeholder="Deskripsi transaksi..."
+                placeholderTextColor={colors.placeholder}
+              />
+
+            {/* Date */}
+            <Text style={styles.fieldLabel}>Tanggal</Text>
+            <TouchableOpacity 
+              style={styles.datePickerBtn} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <Text style={styles.datePickerText}>{formatDate(date.toISOString())}</Text>
+              <Text style={{fontSize: 10, color: colors.textMuted, marginLeft: 4}}>(v3-JS)</Text>
+            </TouchableOpacity>
+
+            {/* Custom JS Date Picker Modal (Fallback for native errors) */}
+            <Modal visible={showDatePicker} transparent animationType="fade">
+              <View style={[styles.modalOverlay, {justifyContent: 'center', padding: 20}]}>
+                <View style={[styles.modalSheet, {borderRadius: 16, padding: 20}]}>
+                  <Text style={[styles.modalTitle, {textAlign: 'center'}]}>Pilih Tanggal</Text>
+                  
+                  <View style={{flexDirection: 'row', justifyContent: 'space-around', marginVertical: 20}}>
+                    {/* Day */}
+                    <View style={{alignItems: 'center'}}>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setDate(newDate.getDate() + 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-up" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={{fontSize: 24, fontWeight: '700'}}>{date.getDate()}</Text>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setDate(newDate.getDate() - 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-down" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={typography.caption}>Tgl</Text>
+                    </View>
+                    
+                    {/* Month */}
+                    <View style={{alignItems: 'center'}}>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-up" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={{fontSize: 20, fontWeight: '700'}}>
+                        {['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][date.getMonth()]}
+                      </Text>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-down" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={typography.caption}>Bln</Text>
+                    </View>
+
+                    {/* Year */}
+                    <View style={{alignItems: 'center'}}>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setFullYear(newDate.getFullYear() + 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-up" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={{fontSize: 20, fontWeight: '700'}}>{date.getFullYear()}</Text>
+                      <TouchableOpacity onPress={() => {
+                        const newDate = new Date(date);
+                        newDate.setFullYear(newDate.getFullYear() - 1);
+                        setDate(newDate);
+                      }}><Ionicons name="chevron-down" size={30} color={colors.primary} /></TouchableOpacity>
+                      <Text style={typography.caption}>Thn</Text>
+                    </View>
+                  </View>
+
+                  <Button title="Selesai" onPress={() => setShowDatePicker(false)} />
+                </View>
+              </View>
+            </Modal>
+
+              {/* Category */}
+              <Text style={styles.fieldLabel}>Kategori</Text>
+              <View style={styles.catGrid}>
+                {catFiltered.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.catChip, categoryId === cat.id && styles.catChipActive]}
+                    onPress={() => setCategoryId(cat.id)}
+                  >
+                    <Text style={styles.catEmoji}>{cat.icon || '📌'}</Text>
+                    <Text style={[styles.catName, categoryId === cat.id && { color: colors.primary, fontWeight: '700' }]} numberOfLines={1}>{cat.name}</Text>
+                  </TouchableOpacity>
+                ))}
+                {catFiltered.length === 0 && (
+                  <Text style={styles.noCat}>Buat kategori dulu di tab Profil</Text>
+                )}
+              </View>
+
+              <View style={styles.modalActions}>
+                <Button title="Batal" variant="outline" onPress={() => setModalVisible(false)} style={styles.cancelBtn} />
+                <Button title={editItem ? 'Simpan' : 'Tambah'} onPress={handleSave} loading={saving} style={styles.saveBtn} />
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        actions={alert.actions}
+      />
     </SafeAreaView>
   );
 };
@@ -259,6 +372,17 @@ const styles = StyleSheet.create({
   fieldLabel: { ...typography.label, marginBottom: 4, marginTop: 8 },
   amountInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 22, fontWeight: '700', color: colors.text, backgroundColor: colors.surface },
   noteInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface },
+  datePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 12,
+    backgroundColor: colors.surface,
+  },
+  datePickerText: { fontSize: 16, color: colors.text, fontWeight: '600' },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.round, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   catChipActive: { borderColor: colors.primary, backgroundColor: colors.background },

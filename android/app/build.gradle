@@ -17,7 +17,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -45,12 +45,28 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    splits {
+        abi {
+            reset()
+            enable false  // Disabled: cannot use ABI splits with AAB bundles (Play Store)
+            universalApk false
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'
+        }
+        release {
+            if (project.hasProperty('SAKUBUMI_UPLOAD_STORE_FILE')) {
+                storeFile file(SAKUBUMI_UPLOAD_STORE_FILE)
+                storePassword SAKUBUMI_UPLOAD_STORE_PASSWORD
+                keyAlias SAKUBUMI_UPLOAD_KEY_ALIAS
+                keyPassword SAKUBUMI_UPLOAD_KEY_PASSWORD
+            }
         }
     }
     buildTypes {
@@ -60,8 +76,9 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }

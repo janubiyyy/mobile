@@ -7,8 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import CustomAlert from '../../components/CustomAlert';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthStack';
 import api from '../../services/api';
@@ -26,6 +26,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; actions: any[] }>({
+    visible: false,
+    title: '',
+    message: '',
+    actions: [],
+  });
 
   const validate = () => {
     const newErrors: typeof errors = {};
@@ -48,15 +54,23 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         password,
       });
       if (data.success) {
-        Alert.alert('Berhasil! 🎉', 'Akun telah dibuat. Silakan login.', [
-          { text: 'Login Sekarang', onPress: () => navigation.navigate('Login') },
-        ]);
+        setAlert({
+          visible: true,
+          title: 'Berhasil! 🎉',
+          message: 'Akun telah dibuat. Silakan login.',
+          actions: [
+            { text: 'Login Sekarang', onPress: () => { setAlert(a => ({ ...a, visible: false })); navigation.navigate('Login'); } },
+          ],
+        });
       }
     } catch (error: any) {
-      console.log('Register Error Full:', error);
-      console.log('Register Error Response:', error.response);
       const msg = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
-      Alert.alert('Registrasi Gagal', msg);
+      setAlert({
+        visible: true,
+        title: 'Registrasi Gagal',
+        message: msg,
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
     } finally {
       setLoading(false);
     }
@@ -130,6 +144,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+        <CustomAlert
+          visible={alert.visible}
+          title={alert.title}
+          message={alert.message}
+          actions={alert.actions}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

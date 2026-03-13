@@ -5,7 +5,7 @@ const API_URL = 'https://sakubumi-api.vercel.app/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // 30 detik
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,12 +23,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: tangani 401 (token expired)
+// Response interceptor: tangani error
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       useAuthStore.getState().logout();
+    }
+    // Ganti pesan network error menjadi lebih jelas
+    if (error.message === 'Network Error' || error.code === 'ECONNABORTED') {
+      error.message = 'Tidak dapat menghubungi server. Periksa koneksi internet kamu.';
     }
     return Promise.reject(error);
   }

@@ -86,28 +86,42 @@ const ReportScreen = () => {
       const filename = `laporan-sakubumi-${new Date().toISOString().split('T')[0]}.csv`;
       // Share CSV as base64 data URI - no native file system access needed
       // Simple base64 encoding compatible with React Native/Hermes
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
       const toBase64 = (str: string) => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
         let output = '';
         const bytes = Array.from(unescape(encodeURIComponent(str))).map(c => c.charCodeAt(0));
         for (let i = 0; i < bytes.length; i += 3) {
-          const b0 = bytes[i], b1 = bytes[i+1] ?? 0, b2 = bytes[i+2] ?? 0;
-          output += chars[b0 >> 2] + chars[((b0 & 3) << 4) | (b1 >> 4)] +
-                    (bytes[i+1] !== undefined ? chars[((b1 & 15) << 2) | (b2 >> 6)] : '=') +
-                    (bytes[i+2] !== undefined ? chars[b2 & 63] : '=');
+          const b0 = bytes[i], b1 = bytes[i+1], b2 = bytes[i+2];
+          output += chars[b0 >> 2] + chars[((b0 & 3) << 4) | (b1 >> 4 || 0)] +
+                    (b1 !== undefined ? chars[((b1 & 15) << 2) | (b2 >> 6 || 0)] : '=') +
+                    (b2 !== undefined ? chars[b2 & 63] : '=');
         }
         return output;
       };
       const base64 = toBase64(csvContent);
-      await Share.open({
+      const shareOptions = {
         url: `data:text/csv;base64,${base64}`,
-        type: 'text/csv',
         filename,
-        message: 'Laporan Keuangan Saku Bumi',
-      });
+        type: 'text/csv',
+        title: 'Ekspor Laporan Saku Bumi',
+        subject: 'Laporan Keuangan Saku Bumi',
+        failOnCancel: false,
+      };
+
+      try {
+        await Share.open(shareOptions);
+      } catch (err: any) {
+        // Fallback: If text/csv fails on some Androids, try text/plain
+        if (err?.message !== 'User did not share') {
+          await Share.open({
+            ...shareOptions,
+            type: 'text/plain',
+          });
+        }
+      }
     } catch (e: any) {
       if (e?.message !== 'User did not share') {
-        Alert.alert('Gagal', 'Tidak dapat mengekspor laporan. Coba lagi.');
+        Alert.alert('Gagal', `Tidak dapat mengekspor: ${e.message || 'Coba lagi'}`);
       }
     } finally {
       setExporting(false);

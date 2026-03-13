@@ -8,8 +8,8 @@ import {
   Platform,
   TouchableOpacity,
   Image,
-  Alert,
 } from 'react-native';
+import CustomAlert from '../../components/CustomAlert';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthStack';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -28,6 +28,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [alert, setAlert] = useState<{ visible: boolean; title: string; message: string; actions: any[] }>({
+    visible: false,
+    title: '',
+    message: '',
+    actions: [],
+  });
 
   const validate = () => {
     const newErrors: typeof errors = {};
@@ -48,7 +54,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       }
     } catch (error: any) {
       const msg = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
-      Alert.alert('Login Gagal', msg);
+      setAlert({
+        visible: true,
+        title: 'Login Gagal',
+        message: msg,
+        actions: [{ text: 'Oke', onPress: () => setAlert(a => ({ ...a, visible: false })) }],
+      });
     } finally {
       setLoading(false);
     }
@@ -113,6 +124,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+        <CustomAlert
+          visible={alert.visible}
+          title={alert.title}
+          message={alert.message}
+          actions={alert.actions}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
