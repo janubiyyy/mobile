@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import Ionicons, { IoniconsIconName } from 'react-native-vector-icons/Ionicons';
 import { View, StyleSheet } from 'react-native';
 import { colors, radius } from '../theme/colors';
 
@@ -36,7 +36,7 @@ const TabNavigator = () => {
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ focused, color }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+          let iconName: IoniconsIconName;
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Transaksi') {

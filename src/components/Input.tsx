@@ -8,14 +8,14 @@ import {
   ViewStyle,
   TextInputProps,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import Ionicons, { IoniconsIconName } from 'react-native-vector-icons/Ionicons';
 import { colors, radius, spacing, typography } from '../theme/colors';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
+  leftIcon?: IoniconsIconName;
+  rightIcon?: IoniconsIconName;
   onRightIconPress?: () => void;
   containerStyle?: ViewStyle;
   secureToggle?: boolean;

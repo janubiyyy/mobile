@@ -9,6 +9,8 @@ declare module 'react-native-vector-icons/Ionicons' {
     style?: StyleProp<ViewStyle>;
   }
 
+  export type IoniconsIconName = keyof typeof Ionicons.glyphMap & string;
+
   export default class Ionicons extends Component<IconProps> {
     static glyphMap: { [key: string]: number };
   }
